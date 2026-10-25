@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Thorns.Blazor/Thorns.Blazor.csproj" />
+  <Project Path="Thorns/Thorns.csproj" />
+</Solution>

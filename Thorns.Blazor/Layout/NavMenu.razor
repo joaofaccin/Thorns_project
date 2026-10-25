@@ -1,0 +1,66 @@
+﻿@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthService AuthService
+@inject NavigationManager Navigation
+
+<div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="">
+            Thorns
+        </a>
+    </div>
+</div>
+
+<div class="nav-scrollable">
+    <nav class="flex-column">
+
+        <AuthorizeView Context="usuario">
+
+            <Authorized>
+
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="dashboard">
+                        Dashboard
+                    </NavLink>
+                </div>
+
+                <AuthorizeView Roles="Admin" Context="administrador">
+                    <Authorized>
+                        <div class="nav-item px-3">
+                            <NavLink class="nav-link" href="meu-perfil">
+                                Meu Perfil
+                            </NavLink>
+                        </div>
+                    </Authorized>
+                </AuthorizeView>
+
+                <div class="nav-item px-3">
+                    <button type="button" class="nav-link text-white" @onclick="Sair">
+                        Sair
+                    </button>
+                </div>
+
+            </Authorized>
+
+            <NotAuthorized>
+
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="login">
+                        Entrar
+                    </NavLink>
+                </div>
+
+            </NotAuthorized>
+
+        </AuthorizeView>
+
+    </nav>
+</div>
+
+@code {
+    private async Task Sair()
+    {
+        await AuthService.LogoutAsync();
+
+        Navigation.NavigateTo("/login", replace: true);
+    }
+}

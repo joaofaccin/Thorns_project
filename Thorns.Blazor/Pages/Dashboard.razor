@@ -1,0 +1,164 @@
+@page "/dashboard"
+
+@attribute [Authorize]
+
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Thorns.Blazor.Models
+@using Microsoft.JSInterop
+@inject UserService UserService
+@inject IJSRuntime JS
+@inject AuthService AuthService
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthStateProvider
+
+<h1 class="mb-4">Dashboard - Thorns</h1>
+
+<AuthorizeView Context="auth">
+    <Authorized>
+
+        <div class="alert alert-success">
+            Bem-vindo,
+            <strong>@auth.User.Identity?.Name</strong>!
+        </div>
+
+        <AuthorizeView Roles="Admin" Context="admin">
+            <Authorized>
+
+                @if (!string.IsNullOrEmpty(error))
+                {
+                    <div class="alert alert-danger">
+                        @error
+                    </div>
+                }
+
+                @if (loading)
+                {
+                    <p>Carregando informações...</p>
+                }
+                else
+                {
+                    <div class="row g-3 mb-4">
+
+                        <div class="col-md-4">
+                            <div class="card shadow-sm">
+                                <div class="card-body">
+                                    <h6>Total de usuários</h6>
+                                    <h2>@totalUsers</h2>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="card shadow-sm">
+                                <div class="card-body">
+                                    <h6>Administradores</h6>
+                                    <h2>@totalAdmins</h2>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="card shadow-sm">
+                                <div class="card-body">
+                                    <h6>Usuários comuns</h6>
+                                    <h2>@totalCommonUsers</h2>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <div class="card shadow-sm">
+                        <div class="card-body">
+
+                            <h5>Distribuição de usuários</h5>
+
+                            <div style="height: 320px;">
+                                <canvas id="usersChart"></canvas>
+                            </div>
+
+                        </div>
+                    </div>
+                }
+
+            </Authorized>
+        </AuthorizeView>
+
+        <AuthorizeView Roles="User" Context="user">
+            <Authorized>
+                <div class="card">
+                    <div class="card-body">
+                        <h4>Minha conta</h4>
+                        <p>Bem-vindo ao sistema Thorns.</p>
+                    </div>
+                </div>
+            </Authorized>
+        </AuthorizeView>
+
+    </Authorized>
+</AuthorizeView>
+
+@code {
+
+    private int totalUsers;
+    private int totalAdmins;
+    private int totalCommonUsers;
+
+    private bool loading = true;
+    private bool renderChart = false;
+
+    private string error = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+
+        var user = authState.User;
+
+        // Somente administradores carregam estatísticas.
+        if (user.Identity?.IsAuthenticated != true ||
+            !user.IsInRole("Admin"))
+        {
+            loading = false;
+            return;
+        }
+
+        try
+        {
+            var users = await UserService.GetUsersAsync();
+
+            totalUsers = users.Count;
+
+            totalAdmins = users.Count(u => u.Role == "Admin");
+
+            totalCommonUsers = users.Count(u => u.Role == "User");
+
+            renderChart = true;
+        }
+        catch (Exception ex)
+        {
+            error = "Não foi possível carregar os dados dos usuários.";
+
+            Console.Error.WriteLine(ex);
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (renderChart)
+        {
+            renderChart = false;
+
+            await JS.InvokeVoidAsync(
+                "dashboardCharts.renderUsersChart",
+                totalAdmins,
+                totalCommonUsers
+            );
+        }
+    }
+}

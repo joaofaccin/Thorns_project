@@ -1,0 +1,114 @@
+@page "/login"
+@layout LoginLayout
+
+@using Thorns.Blazor.Services
+@inject AuthService AuthService
+@inject NavigationManager Navigation
+
+<PageTitle>Login - Thorns</PageTitle>
+
+<div class="login-page">
+
+    <section class="login-left">
+
+        <div class="login-container">
+
+            <h1>Faça seu login<span>.</span></h1>
+
+            <form @onsubmit="RealizarLogin" @onsubmit:preventDefault="true">
+
+                <div class="form-group">
+                    <label for="email">✉ E-mail</label>
+
+                    <input id="email" type="email" @bind="email" autocomplete="username" placeholder="Digite seu e-mail"
+                           required disabled="@loading" />
+                </div>
+
+                <div class="form-group">
+                    <label for="password">🔒 Senha</label>
+
+                    <input id="password" type="password" @bind="password" autocomplete="current-password"
+                           placeholder="Digite sua senha" required disabled="@loading" />
+                </div>
+
+                <div class="forgot-password">
+                    <span>Esqueci minha senha</span>
+                </div>
+
+                <button type="submit" class="login-button" disabled="@loading">
+
+                    @if (loading)
+                    {
+                        <span>Entrando...</span>
+                    }
+                    else
+                    {
+                        <span>Entrar</span>
+                    }
+
+                </button>
+
+                @if (!string.IsNullOrEmpty(error))
+                {
+                    <div class="login-error" role="alert">
+                        @error
+                    </div>
+                }
+
+            </form>
+
+            <div class="register-link">
+                <span>Ainda não tenho uma conta</span>
+            </div>
+
+        </div>
+
+    </section>
+
+    <section class="login-right" aria-hidden="true"></section>
+
+</div>
+
+@code {
+
+    private string email = string.Empty;
+    private string password = string.Empty;
+    private string error = string.Empty;
+
+    private bool loading = false;
+
+    private async Task RealizarLogin()
+    {
+        if (loading)
+            return;
+
+        loading = true;
+        error = string.Empty;
+
+        try
+        {
+            var success = await AuthService.LoginAsync(
+                email,
+                password
+            );
+
+            if (!success)
+            {
+                error = "E-mail ou senha inválidos.";
+                return;
+            }
+
+            Navigation.NavigateTo("/dashboard");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine(ex);
+
+            error = "Não foi possível realizar o login.";
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+}

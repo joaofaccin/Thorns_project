@@ -1,0 +1,116 @@
+@page "/meu-perfil"
+@attribute [Authorize]
+
+@using Microsoft.AspNetCore.Authorization
+@using Thorns.Blazor.Models
+
+@inject UserService UserService
+
+<PageTitle>Meu Perfil - Thorns</PageTitle>
+
+<h1 class="mb-4">Meu Perfil</h1>
+
+@if (carregando)
+{
+    <p>Carregando informações do perfil...</p>
+}
+else if (!string.IsNullOrEmpty(erro))
+{
+    <div class="alert alert-danger">
+        @erro
+    </div>
+}
+else if (usuario is not null)
+{
+    <div class="card shadow-sm">
+        <div class="card-header">
+            <h5 class="mb-0">Informações da conta</h5>
+        </div>
+
+        <div class="card-body">
+
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <strong>Nome</strong>
+                    <p>@usuario.Name</p>
+                </div>
+
+                <div class="col-md-6">
+                    <strong>E-mail</strong>
+                    <p>@usuario.Email</p>
+                </div>
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <strong>Perfil de acesso</strong>
+                    <p>
+                        <span class="badge bg-primary">
+                            @usuario.Role
+                        </span>
+                    </p>
+                </div>
+
+                <div class="col-md-6">
+                    <strong>Status</strong>
+                    <p>
+                        @if (usuario.IsActive)
+                        {
+                            <span class="badge bg-success">Ativo</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-danger">Inativo</span>
+                        }
+                    </p>
+                </div>
+            </div>
+
+            <hr />
+
+            <div class="row">
+                <div class="col-md-6">
+                    <strong>Data de cadastro</strong>
+                    <p>@usuario.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</p>
+                </div>
+
+                <div class="col-md-6">
+                    <strong>Último login</strong>
+                    <p>
+                        @(usuario.LastLogin?.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+                          ?? "Não informado")
+                    </p>
+                </div>
+            </div>
+
+        </div>
+    </div>
+}
+
+@code {
+    private CurrentUserResponse? usuario;
+    private bool carregando = true;
+    private string erro = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            usuario = await UserService.GetMeAsync();
+
+            if (usuario is null)
+            {
+                erro = "Não foi possível encontrar os dados do usuário.";
+            }
+        }
+        catch (HttpRequestException ex)
+        {
+            erro = "Não foi possível carregar seu perfil.";
+            Console.Error.WriteLine(ex);
+        }
+        finally
+        {
+            carregando = false;
+        }
+    }
+}
