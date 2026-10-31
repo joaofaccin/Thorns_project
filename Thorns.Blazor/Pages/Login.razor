@@ -58,7 +58,7 @@
             </form>
 
             <div class="register-link">
-                <span>Ainda não tenho uma conta</span>
+                <a href="/cadastro">Ainda não tenho uma conta</a>
             </div>
 
         </div>
@@ -87,12 +87,18 @@
 
         try
         {
-            var success = await AuthService.LoginAsync(
+            var result = await AuthService.LoginAsync(
                 email,
                 password
             );
 
-            if (!success)
+            if (result == AuthOperationResult.RateLimited)
+            {
+                error = "Muitas tentativas. Aguarde e tente novamente.";
+                return;
+            }
+
+            if (result != AuthOperationResult.Success)
             {
                 error = "E-mail ou senha inválidos.";
                 return;

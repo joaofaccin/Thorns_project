@@ -14,7 +14,13 @@ namespace Thorns.Models
 
         public string Email { get; set; } = string.Empty;
 
+        public string? Cpf { get; set; }
+
+        public string? Cep { get; set; }
+
         public string PasswordHash { get; set; } = string.Empty;
+
+        public int TokenVersion { get; set; }
 
         public UserRole Role { get; set; } = UserRole.User;
 

@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using Thorns.Models.Enum;
+using Thorns.Validation;
 
 namespace Thorns.DTOs;
 
@@ -21,6 +22,14 @@ public class CreateUserRequest
     )]
     public string Email { get; set; } = string.Empty;
 
+    [Required(ErrorMessage = "O CPF é obrigatório.")]
+    [Cpf(ErrorMessage = "Informe um CPF válido.")]
+    public string Cpf { get; set; } = string.Empty;
+
+    [Required(ErrorMessage = "O CEP é obrigatório.")]
+    [Cep(ErrorMessage = "Informe um CEP válido.")]
+    public string Cep { get; set; } = string.Empty;
+
     [Required(ErrorMessage = "A senha é obrigatória.")]
     [StringLength(
         100,
@@ -30,5 +39,6 @@ public class CreateUserRequest
     public string Password { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "A função do usuário é obrigatória.")]
+    [EnumDataType(typeof(UserRole), ErrorMessage = "Informe uma função válida.")]
     public UserRole Role { get; set; }
 }

@@ -23,11 +23,17 @@
                     </NavLink>
                 </div>
 
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="meu-perfil">
+                        Meu Perfil
+                    </NavLink>
+                </div>
+
                 <AuthorizeView Roles="Admin" Context="administrador">
                     <Authorized>
                         <div class="nav-item px-3">
-                            <NavLink class="nav-link" href="meu-perfil">
-                                Meu Perfil
+                            <NavLink class="nav-link" href="usuarios">
+                                Usuários
                             </NavLink>
                         </div>
                     </Authorized>

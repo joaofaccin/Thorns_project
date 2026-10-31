@@ -1,0 +1,32 @@
+@inject IJSRuntime JS
+
+<button type="button"
+        class="btn btn-outline-secondary theme-toggle"
+        aria-label="@ThemeButtonLabel"
+        aria-pressed="@(theme == "dark")"
+        @onclick="ToggleThemeAsync">
+    <span aria-hidden="true">@(theme == "dark" ? "☀" : "☾")</span>
+    <span>@ThemeButtonLabel</span>
+</button>
+
+@code {
+    private string theme = "light";
+
+    private string ThemeButtonLabel =>
+        theme == "dark" ? "Ativar modo claro" : "Ativar modo escuro";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            theme = await JS.InvokeAsync<string>("thornsTheme.getTheme");
+            StateHasChanged();
+        }
+    }
+
+    private async Task ToggleThemeAsync()
+    {
+        theme = theme == "dark" ? "light" : "dark";
+        await JS.InvokeVoidAsync("thornsTheme.setTheme", theme);
+    }
+}

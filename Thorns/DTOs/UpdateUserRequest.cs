@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using Thorns.Models.Enum;
+using Thorns.Validation;
 
 namespace Thorns.DTOs;
 
@@ -21,13 +22,21 @@ public class UpdateUserRequest
     )]
     public string Email { get; set; } = string.Empty;
 
-    [StringLength(
-        100,
-        MinimumLength = 6,
-        ErrorMessage = "A senha deve ter no mínimo 6 caracteres."
+    [Required(ErrorMessage = "O CPF é obrigatório.")]
+    [Cpf(ErrorMessage = "Informe um CPF válido.")]
+    public string Cpf { get; set; } = string.Empty;
+
+    [Required(ErrorMessage = "O CEP é obrigatório.")]
+    [Cep(ErrorMessage = "Informe um CEP válido.")]
+    public string Cep { get; set; } = string.Empty;
+
+    [RegularExpression(
+        @"^$|^.{6,100}$",
+        ErrorMessage = "A senha deve ter entre 6 e 100 caracteres."
     )]
     public string? Password { get; set; }
 
     [Required(ErrorMessage = "A função do usuário é obrigatória.")]
+    [EnumDataType(typeof(UserRole), ErrorMessage = "Informe uma função válida.")]
     public UserRole Role { get; set; }
 }

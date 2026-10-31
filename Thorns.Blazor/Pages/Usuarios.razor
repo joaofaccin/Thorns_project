@@ -1,0 +1,210 @@
+@page "/usuarios"
+@attribute [Authorize(Roles = "Admin")]
+
+@using Microsoft.AspNetCore.Authorization
+@using Thorns.Blazor.Models
+@inject UserService UserService
+
+<PageTitle>Usuários - Thorns</PageTitle>
+
+<h1 class="mb-4">Usuários</h1>
+
+@if (!string.IsNullOrWhiteSpace(erro))
+{
+    <div class="alert alert-danger" role="alert">@erro</div>
+}
+
+@if (carregando)
+{
+    <p>Carregando usuários...</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped align-middle">
+            <thead>
+                <tr>
+                    <th>Nome</th>
+                    <th>E-mail</th>
+                    <th>CPF</th>
+                    <th>CEP</th>
+                    <th>Perfil</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var usuario in usuarios)
+                {
+                    <tr>
+                        <td>@usuario.Name</td>
+                        <td>@usuario.Email</td>
+                        <td>@usuario.Cpf</td>
+                        <td>@usuario.Cep</td>
+                        <td>@usuario.Role</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary"
+                                    type="button"
+                                    @onclick="() => SelecionarAsync(usuario.Id)">
+                                Alterar
+                            </button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    @if (formulario is not null)
+    {
+        <div class="card shadow-sm mt-4">
+            <div class="card-header">
+                <h2 class="h5 mb-0">Alterar usuário: @usuarioSelecionado?.Name</h2>
+            </div>
+            <div class="card-body">
+                <EditForm Model="formulario" OnValidSubmit="SalvarAsync">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label" for="nome">Nome</label>
+                            <InputText id="nome" class="form-control" @bind-Value="formulario.Name" />
+                            <ValidationMessage For="@(() => formulario.Name)" />
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label" for="email">E-mail</label>
+                            <InputText id="email" type="email" class="form-control" @bind-Value="formulario.Email" />
+                            <ValidationMessage For="@(() => formulario.Email)" />
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label" for="cpf">CPF</label>
+                            <InputText id="cpf" class="form-control" placeholder="000.000.000-00" @bind-Value="formulario.Cpf" />
+                            <ValidationMessage For="@(() => formulario.Cpf)" />
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label" for="cep">CEP</label>
+                            <InputText id="cep" class="form-control" placeholder="00000-000" @bind-Value="formulario.Cep" />
+                            <ValidationMessage For="@(() => formulario.Cep)" />
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label" for="role">Perfil de acesso</label>
+                            <InputSelect id="role" class="form-select" @bind-Value="formulario.Role">
+                                <option value="User">Usuário</option>
+                                <option value="Admin">Administrador</option>
+                            </InputSelect>
+                            <ValidationMessage For="@(() => formulario.Role)" />
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label" for="senha">Nova senha (opcional)</label>
+                            <InputText id="senha" type="password" class="form-control" @bind-Value="formulario.Password" />
+                            <ValidationMessage For="@(() => formulario.Password)" />
+                        </div>
+                    </div>
+
+                    @if (!string.IsNullOrWhiteSpace(erroSalvar))
+                    {
+                        <div class="alert alert-danger" role="alert">@erroSalvar</div>
+                    }
+
+                    <button class="btn btn-primary" type="submit" disabled="@salvando">
+                        @(salvando ? "Salvando..." : "Salvar alterações")
+                    </button>
+                </EditForm>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private List<UserResponse> usuarios = [];
+    private UserResponse? usuarioSelecionado;
+    private AdminUserForm? formulario;
+    private bool carregando = true;
+    private bool salvando;
+    private string erro = string.Empty;
+    private string erroSalvar = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            usuarios = await UserService.GetUsersAsync();
+        }
+        catch (HttpRequestException)
+        {
+            erro = "Não foi possível carregar a lista de usuários.";
+        }
+        finally
+        {
+            carregando = false;
+        }
+    }
+
+    private async Task SelecionarAsync(int id)
+    {
+        erroSalvar = string.Empty;
+        try
+        {
+            usuarioSelecionado = await UserService.GetUserByIdAsync(id);
+            if (usuarioSelecionado is null)
+            {
+                erroSalvar = "Usuário não encontrado.";
+                formulario = null;
+                return;
+            }
+
+            formulario = new AdminUserForm
+            {
+                Name = usuarioSelecionado.Name,
+                Email = usuarioSelecionado.Email,
+                Cpf = usuarioSelecionado.Cpf,
+                Cep = usuarioSelecionado.Cep,
+                Role = usuarioSelecionado.Role
+            };
+        }
+        catch (HttpRequestException)
+        {
+            erroSalvar = "Não foi possível carregar os dados do usuário.";
+        }
+    }
+
+    private async Task SalvarAsync()
+    {
+        if (usuarioSelecionado is null || formulario is null)
+            return;
+
+        salvando = true;
+        erroSalvar = string.Empty;
+        try
+        {
+            await UserService.UpdateUserAsync(usuarioSelecionado.Id, formulario);
+            usuarios = await UserService.GetUsersAsync();
+            usuarioSelecionado = usuarios.FirstOrDefault(user => user.Id == usuarioSelecionado.Id);
+            if (usuarioSelecionado is not null)
+            {
+                formulario.Name = usuarioSelecionado.Name;
+                formulario.Email = usuarioSelecionado.Email;
+                formulario.Cpf = usuarioSelecionado.Cpf;
+                formulario.Cep = usuarioSelecionado.Cep;
+                formulario.Role = usuarioSelecionado.Role;
+                formulario.Password = null;
+            }
+        }
+        catch (HttpRequestException exception)
+        {
+            erroSalvar = exception.StatusCode == System.Net.HttpStatusCode.Conflict
+                ? "Já existe outro usuário com esse e-mail ou CPF."
+                : "Não foi possível salvar as alterações.";
+        }
+        finally
+        {
+            salvando = false;
+        }
+    }
+}

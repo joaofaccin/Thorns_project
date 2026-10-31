@@ -1,0 +1,114 @@
+@page "/cadastro"
+@layout LoginLayout
+
+@using Thorns.Blazor.Models
+@using Thorns.Blazor.Services
+@inject AuthService AuthService
+
+<PageTitle>Cadastro - Thorns</PageTitle>
+
+<div class="registration-page">
+    <section class="registration-panel">
+        <div class="registration-container">
+            <h1>Criar conta<span>.</span></h1>
+
+            <EditForm Model="formulario" OnValidSubmit="CadastrarAsync">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                <div class="form-group">
+                    <label for="name">Nome</label>
+                    <InputText id="name" class="form-control" @bind-Value="formulario.Name"
+                               autocomplete="name" disabled="@salvando" />
+                    <ValidationMessage For="@(() => formulario.Name)" />
+                </div>
+
+                <div class="form-group">
+                    <label for="email">E-mail</label>
+                    <InputText id="email" type="email" class="form-control"
+                               @bind-Value="formulario.Email"
+                               autocomplete="email" disabled="@salvando" />
+                    <ValidationMessage For="@(() => formulario.Email)" />
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Senha (mínimo 6 caracteres)</label>
+                    <InputText id="password" type="password" class="form-control"
+                               @bind-Value="formulario.Password"
+                               autocomplete="new-password" disabled="@salvando" />
+                    <ValidationMessage For="@(() => formulario.Password)" />
+                </div>
+
+                <div class="form-group">
+                    <label for="confirm-password">Confirmar senha</label>
+                    <InputText id="confirm-password" type="password" class="form-control"
+                               @bind-Value="formulario.ConfirmPassword"
+                               autocomplete="new-password" disabled="@salvando" />
+                    <ValidationMessage For="@(() => formulario.ConfirmPassword)" />
+                </div>
+
+                @if (!string.IsNullOrWhiteSpace(mensagem))
+                {
+                    <div class="alert @classeMensagem" role="alert">@mensagem</div>
+                }
+
+                <button type="submit" class="btn btn-primary w-100" disabled="@salvando">
+                    @(salvando ? "Criando conta..." : "Criar conta")
+                </button>
+            </EditForm>
+
+            <div class="register-link">
+                <a href="/login">Já tenho uma conta</a>
+            </div>
+        </div>
+    </section>
+    <section class="registration-art" aria-hidden="true"></section>
+</div>
+
+@code {
+    private readonly UserRegistrationForm formulario = new();
+    private bool salvando;
+    private string mensagem = string.Empty;
+    private string classeMensagem = "alert-danger";
+
+    private async Task CadastrarAsync()
+    {
+        if (salvando)
+            return;
+
+        salvando = true;
+        mensagem = string.Empty;
+
+        try
+        {
+            var result = await AuthService.RegisterAsync(formulario);
+            switch (result)
+            {
+                case AuthOperationResult.Success:
+                    classeMensagem = "alert-success";
+                    mensagem = "Conta criada como usuário. Agora você pode entrar.";
+                    formulario.Password = string.Empty;
+                    formulario.ConfirmPassword = string.Empty;
+                    break;
+                case AuthOperationResult.Conflict:
+                    mensagem = "Já existe uma conta com esse e-mail.";
+                    break;
+                case AuthOperationResult.RateLimited:
+                    mensagem = "Muitas tentativas de cadastro. Aguarde um minuto.";
+                    break;
+                default:
+                    throw new InvalidOperationException(
+                        "Resultado inesperado ao criar a conta.");
+            }
+        }
+        catch (HttpRequestException exception)
+        {
+            Console.Error.WriteLine(exception);
+            mensagem = "Não foi possível criar a conta. Tente novamente.";
+        }
+        finally
+        {
+            salvando = false;
+        }
+    }
+}

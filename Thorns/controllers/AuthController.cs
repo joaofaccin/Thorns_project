@@ -1,12 +1,16 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Npgsql;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using Thorns.Data;
 using Thorns.DTOs;
+using Thorns.Models;
+using Thorns.Models.Enum;
 
 namespace Thorns.Controllers;
 
@@ -27,17 +31,18 @@ public class AuthController : ControllerBase
 
     [HttpPost("login")]
     [AllowAnonymous]
-    public async Task<IActionResult> Login(LoginRequest request)
+    [EnableRateLimiting("login")]
+    public async Task<IActionResult> Login(
+        LoginRequest request,
+        CancellationToken cancellationToken)
     {
-        var email = request.Email
-            .Trim()
-            .ToLower();
+        var email = request.Email.Trim().ToLowerInvariant();
 
         var user = await _context.Users
             .FirstOrDefaultAsync(u =>
                 u.Email == email &&
-                u.DeletedAt == null
-            );
+                u.DeletedAt == null,
+                cancellationToken);
 
         if (user == null)
         {
@@ -56,7 +61,7 @@ public class AuthController : ControllerBase
 
         if (!user.IsActive)
         {
-            return Unauthorized("Usuário inativo.");
+            return Unauthorized("E-mail ou senha inválidos.");
         }
 
         // =========================
@@ -65,7 +70,7 @@ public class AuthController : ControllerBase
 
         user.LastLogin = DateTime.UtcNow;
 
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(cancellationToken);
 
         // =========================
         // CONFIGURAÇÕES JWT
@@ -110,6 +115,12 @@ public class AuthController : ControllerBase
             new Claim(
                 ClaimTypes.Role,
                 user.Role.ToString()
+            ),
+
+            new Claim(
+                "token_version",
+                user.TokenVersion.ToString(
+                    System.Globalization.CultureInfo.InvariantCulture)
             )
         };
 
@@ -176,9 +187,60 @@ public class AuthController : ControllerBase
         });
     }
 
+    [HttpPost("register")]
+    [AllowAnonymous]
+    [EnableRateLimiting("registration")]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
+    public async Task<IActionResult> Register(
+        RegisterUserRequest request,
+        CancellationToken cancellationToken)
+    {
+        var email = request.Email.Trim().ToLowerInvariant();
+
+        var duplicate = await _context.Users.AnyAsync(user => user.Email == email,
+            cancellationToken);
+
+        if (duplicate)
+            return Conflict("Já existe um usuário com esse e-mail.");
+
+        var user = new User
+        {
+            Name = request.Name.Trim(),
+            Email = email,
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
+            Role = UserRole.User,
+            IsActive = true
+        };
+
+        _context.Users.Add(user);
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception) when (IsUniqueViolation(exception))
+        {
+            return Conflict("Já existe um usuário com esse e-mail ou CPF.");
+        }
+
+        return CreatedAtAction(
+            nameof(UsersController.GetById),
+            "Users",
+            new { id = user.Id },
+            new
+            {
+                user.Id,
+                user.Name,
+                user.Email,
+                Role = user.Role.ToString()
+            });
+    }
+
     [HttpGet("me")]
     [Authorize]
-    public async Task<IActionResult> Me()
+    public async Task<IActionResult> Me(CancellationToken cancellationToken)
     {
         // Obtém o ID do usuário pelo JWT
         var userIdClaim = User.FindFirstValue(
@@ -199,8 +261,8 @@ public class AuthController : ControllerBase
             .AsNoTracking()
             .FirstOrDefaultAsync(u =>
                 u.Id == userId &&
-                u.DeletedAt == null
-            );
+                u.DeletedAt == null,
+                cancellationToken);
 
         if (user == null || !user.IsActive)
         {
@@ -222,4 +284,10 @@ public class AuthController : ControllerBase
             user.LastLogin
         });
     }
+
+    private static bool IsUniqueViolation(DbUpdateException exception) =>
+        exception.InnerException is PostgresException
+        {
+            SqlState: PostgresErrorCodes.UniqueViolation
+        };
 }

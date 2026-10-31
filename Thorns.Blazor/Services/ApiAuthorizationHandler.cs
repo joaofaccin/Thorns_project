@@ -27,6 +27,14 @@ public class ApiAuthorizationHandler : DelegatingHandler
                 new AuthenticationHeaderValue("Bearer", token);
         }
 
-        return await base.SendAsync(request, cancellationToken);
+        var response = await base.SendAsync(request, cancellationToken);
+
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized &&
+            !string.IsNullOrWhiteSpace(token))
+        {
+            await _authStateProvider.LogoutAsync();
+        }
+
+        return response;
     }
 }

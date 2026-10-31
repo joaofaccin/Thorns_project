@@ -1,9 +1,15 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
+using System.Net;
+using System.Security.Claims;
 using System.Text;
 using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
 using Thorns.Data;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -88,6 +94,49 @@ builder.Services
 
         options.Events = new JwtBearerEvents
         {
+            OnTokenValidated = async context =>
+            {
+                var userIdClaim = context.Principal?
+                    .FindFirstValue(ClaimTypes.NameIdentifier);
+                var roleClaim = context.Principal?
+                    .FindFirstValue(ClaimTypes.Role);
+                var tokenVersionClaim = context.Principal?
+                    .FindFirstValue("token_version");
+
+                if (!int.TryParse(userIdClaim, out var userId) ||
+                    !int.TryParse(tokenVersionClaim, out var tokenVersion))
+                {
+                    context.Fail("Token sem informações de sessão válidas.");
+                    return;
+                }
+
+                var dbContext = context.HttpContext.RequestServices
+                    .GetRequiredService<AppDbContext>();
+                var currentUser = await dbContext.Users
+                    .AsNoTracking()
+                    .Where(user => user.Id == userId)
+                    .Select(user => new
+                    {
+                        user.IsActive,
+                        user.DeletedAt,
+                        user.Role,
+                        user.TokenVersion
+                    })
+                    .SingleOrDefaultAsync(context.HttpContext.RequestAborted);
+
+                if (currentUser is null ||
+                    !currentUser.IsActive ||
+                    currentUser.DeletedAt is not null ||
+                    tokenVersion != currentUser.TokenVersion ||
+                    !string.Equals(
+                        roleClaim,
+                        currentUser.Role.ToString(),
+                        StringComparison.Ordinal))
+                {
+                    context.Fail("Token revogado ou usuário sem acesso.");
+                }
+            },
+
             // Falha ao validar o token
             OnAuthenticationFailed = context =>
             {
@@ -146,17 +195,106 @@ builder.Services
 builder.Services.AddAuthorization();
 
 // ==========================================
+// LOGIN RATE LIMITING
+// ==========================================
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.AddPolicy("login", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString()
+                ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+
+    options.AddPolicy("registration", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString()
+                ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 3,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+
+    options.OnRejected = async (context, cancellationToken) =>
+    {
+        context.HttpContext.Response.StatusCode =
+            StatusCodes.Status429TooManyRequests;
+        context.HttpContext.Response.Headers.RetryAfter = "60";
+        context.HttpContext.Response.ContentType = "application/problem+json";
+        var isRegistration = context.HttpContext.Request.Path.Value?
+            .EndsWith("/register", StringComparison.OrdinalIgnoreCase) == true;
+        await context.HttpContext.Response.WriteAsJsonAsync(
+            new ProblemDetails
+            {
+                Status = StatusCodes.Status429TooManyRequests,
+                Title = isRegistration
+                    ? "Muitas tentativas de cadastro"
+                    : "Muitas tentativas de login",
+                Detail = "Aguarde um minuto antes de tentar novamente."
+            },
+            cancellationToken);
+    };
+});
+
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders =
+        ForwardedHeaders.XForwardedFor |
+        ForwardedHeaders.XForwardedProto;
+
+    foreach (var proxyAddress in builder.Configuration
+                 .GetSection("ForwardedHeaders:KnownProxies")
+                 .Get<string[]>() ?? [])
+    {
+        if (!IPAddress.TryParse(proxyAddress, out var address))
+        {
+            throw new InvalidOperationException(
+                $"Endereço de proxy inválido em ForwardedHeaders:KnownProxies: {proxyAddress}");
+        }
+
+        options.KnownProxies.Add(address);
+    }
+});
+
+// ==========================================
 // CORS / BLAZOR
 // ==========================================
+
+var allowedOrigins = builder.Configuration
+    .GetSection("Cors:AllowedOrigins")
+    .Get<string[]>() ?? [];
+
+if (builder.Environment.IsDevelopment())
+{
+    allowedOrigins = allowedOrigins
+        .Concat([
+            "http://localhost:5020",
+            "https://localhost:7140"
+        ])
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+}
 
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("BlazorPolicy", policy =>
     {
-        policy
-            .WithOrigins("http://localhost:5020")
-            .AllowAnyHeader()
-            .AllowAnyMethod();
+        if (allowedOrigins.Length > 0)
+        {
+            policy
+                .WithOrigins(allowedOrigins)
+                .AllowAnyHeader()
+                .AllowAnyMethod();
+        }
     });
 });
 
@@ -220,6 +358,8 @@ builder.Services.AddSwaggerGen(options =>
 
 var app = builder.Build();
 
+app.UseForwardedHeaders();
+
 // ==========================================
 // SWAGGER
 // ==========================================
@@ -247,6 +387,9 @@ app.UseRouting();
 
 // Aplica a política CORS
 app.UseCors("BlazorPolicy");
+
+// Limita tentativas no endpoint de login
+app.UseRateLimiter();
 
 // Valida a identidade do usuário pelo JWT
 app.UseAuthentication();

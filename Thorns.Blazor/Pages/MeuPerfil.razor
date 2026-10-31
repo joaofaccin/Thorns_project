@@ -3,7 +3,6 @@
 
 @using Microsoft.AspNetCore.Authorization
 @using Thorns.Blazor.Models
-
 @inject UserService UserService
 
 <PageTitle>Meu Perfil - Thorns</PageTitle>
@@ -14,103 +13,123 @@
 {
     <p>Carregando informações do perfil...</p>
 }
-else if (!string.IsNullOrEmpty(erro))
+else if (!string.IsNullOrWhiteSpace(erro))
 {
-    <div class="alert alert-danger">
-        @erro
-    </div>
+    <div class="alert alert-danger" role="alert">@erro</div>
 }
-else if (usuario is not null)
+else
 {
+    @if (!string.IsNullOrWhiteSpace(sucesso))
+    {
+        <div class="alert alert-success" role="status">@sucesso</div>
+    }
+
     <div class="card shadow-sm">
-        <div class="card-header">
-            <h5 class="mb-0">Informações da conta</h5>
-        </div>
-
         <div class="card-body">
+            <EditForm Model="formulario" OnValidSubmit="SalvarAsync">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
 
-            <div class="row mb-3">
-                <div class="col-md-6">
-                    <strong>Nome</strong>
-                    <p>@usuario.Name</p>
+                <div class="mb-3">
+                    <label class="form-label" for="nome">Nome</label>
+                    <InputText id="nome" class="form-control" @bind-Value="formulario.Name" />
+                    <ValidationMessage For="@(() => formulario.Name)" />
                 </div>
 
-                <div class="col-md-6">
-                    <strong>E-mail</strong>
-                    <p>@usuario.Email</p>
-                </div>
-            </div>
-
-            <div class="row mb-3">
-                <div class="col-md-6">
-                    <strong>Perfil de acesso</strong>
-                    <p>
-                        <span class="badge bg-primary">
-                            @usuario.Role
-                        </span>
-                    </p>
+                <div class="mb-3">
+                    <label class="form-label" for="email">E-mail</label>
+                    <InputText id="email" type="email" class="form-control" @bind-Value="formulario.Email" />
+                    <ValidationMessage For="@(() => formulario.Email)" />
                 </div>
 
-                <div class="col-md-6">
-                    <strong>Status</strong>
-                    <p>
-                        @if (usuario.IsActive)
-                        {
-                            <span class="badge bg-success">Ativo</span>
-                        }
-                        else
-                        {
-                            <span class="badge bg-danger">Inativo</span>
-                        }
-                    </p>
-                </div>
-            </div>
-
-            <hr />
-
-            <div class="row">
-                <div class="col-md-6">
-                    <strong>Data de cadastro</strong>
-                    <p>@usuario.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</p>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label" for="cpf">CPF</label>
+                        <InputText id="cpf" class="form-control" placeholder="000.000.000-00" @bind-Value="formulario.Cpf" />
+                        <ValidationMessage For="@(() => formulario.Cpf)" />
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label" for="cep">CEP</label>
+                        <InputText id="cep" class="form-control" placeholder="00000-000" @bind-Value="formulario.Cep" />
+                        <ValidationMessage For="@(() => formulario.Cep)" />
+                    </div>
                 </div>
 
-                <div class="col-md-6">
-                    <strong>Último login</strong>
-                    <p>
-                        @(usuario.LastLogin?.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
-                          ?? "Não informado")
-                    </p>
+                <div class="mb-3">
+                    <span class="form-label">Perfil de acesso:</span>
+                    <span class="badge bg-primary">@perfil?.Role</span>
                 </div>
-            </div>
 
+                @if (!string.IsNullOrWhiteSpace(erroSalvar))
+                {
+                    <div class="alert alert-danger" role="alert">@erroSalvar</div>
+                }
+
+                <button class="btn btn-primary" type="submit" disabled="@salvando">
+                    @(salvando ? "Salvando..." : "Salvar alterações")
+                </button>
+            </EditForm>
         </div>
     </div>
 }
 
 @code {
-    private CurrentUserResponse? usuario;
+    private readonly UserProfileForm formulario = new();
+    private UserProfileResponse? perfil;
     private bool carregando = true;
+    private bool salvando;
     private string erro = string.Empty;
+    private string erroSalvar = string.Empty;
+    private string sucesso = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            usuario = await UserService.GetMeAsync();
-
-            if (usuario is null)
+            perfil = await UserService.GetOwnProfileAsync();
+            if (perfil is null)
             {
                 erro = "Não foi possível encontrar os dados do usuário.";
+                return;
             }
+
+            formulario.Name = perfil.Name;
+            formulario.Email = perfil.Email;
+            formulario.Cpf = perfil.Cpf;
+            formulario.Cep = perfil.Cep;
         }
-        catch (HttpRequestException ex)
+        catch (HttpRequestException exception)
         {
-            erro = "Não foi possível carregar seu perfil.";
-            Console.Error.WriteLine(ex);
+            erro = exception.StatusCode == System.Net.HttpStatusCode.Unauthorized
+                ? "Sua sessão expirou. Entre novamente."
+                : "Não foi possível carregar seu perfil.";
         }
         finally
         {
             carregando = false;
+        }
+    }
+
+    private async Task SalvarAsync()
+    {
+        salvando = true;
+        erroSalvar = string.Empty;
+        sucesso = string.Empty;
+
+        try
+        {
+            await UserService.UpdateOwnProfileAsync(formulario);
+            sucesso = "Perfil atualizado com sucesso.";
+        }
+        catch (HttpRequestException exception)
+        {
+            erroSalvar = exception.StatusCode == System.Net.HttpStatusCode.Conflict
+                ? "Já existe um usuário com esse e-mail ou CPF."
+                : "Não foi possível salvar as alterações.";
+        }
+        finally
+        {
+            salvando = false;
         }
     }
 }

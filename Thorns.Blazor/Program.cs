@@ -30,12 +30,41 @@ builder.Services.AddScoped<AuthenticationStateProvider>(sp =>
 // HTTP CLIENT
 // =====================================
 
+var configuredApiBaseAddress = builder.Configuration["ApiBaseAddress"];
+var uiBaseAddress = new Uri(builder.HostEnvironment.BaseAddress);
+Uri apiBaseAddress;
+
+if (string.IsNullOrWhiteSpace(configuredApiBaseAddress) ||
+    string.Equals(configuredApiBaseAddress, "same-origin", StringComparison.OrdinalIgnoreCase))
+{
+    apiBaseAddress = builder.HostEnvironment.IsDevelopment() &&
+                     uiBaseAddress.Host is "localhost" or "127.0.0.1"
+        ? new Uri(uiBaseAddress.Scheme == Uri.UriSchemeHttps
+            ? "https://localhost:7092/"
+            : "http://localhost:5234/")
+        : uiBaseAddress;
+}
+else if (Uri.TryCreate(
+             configuredApiBaseAddress,
+             UriKind.Absolute,
+             out var configuredUri) &&
+         (configuredUri.Scheme == Uri.UriSchemeHttp ||
+          configuredUri.Scheme == Uri.UriSchemeHttps))
+{
+    apiBaseAddress = configuredUri;
+}
+else
+{
+    throw new InvalidOperationException(
+        "ApiBaseAddress deve ser 'same-origin' ou uma URL HTTP/HTTPS absoluta.");
+}
+
 // HttpClient padrão utilizado pelo AuthService.
 // O login não precisa enviar JWT.
 builder.Services.AddScoped<HttpClient>(sp =>
     new HttpClient
     {
-        BaseAddress = new Uri("http://localhost:5234/")
+        BaseAddress = apiBaseAddress
     }
 );
 
@@ -51,7 +80,7 @@ builder.Services.AddScoped<UserService>(sp =>
 
     var client = new HttpClient(handler)
     {
-        BaseAddress = new Uri("http://localhost:5234/")
+        BaseAddress = apiBaseAddress
     };
 
     return new UserService(client);

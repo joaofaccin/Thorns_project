@@ -1,6 +1,54 @@
 @Thorns_HostAddress = http://localhost:5234
+@token = cole_um_jwt_aqui
+@userId = 1
 
-GET {{Thorns_HostAddress}}/weatherforecast/
+### Cadastro público (cria somente usuário comum)
+POST {{Thorns_HostAddress}}/api/Auth/register
+Content-Type: application/json
+
+{
+  "name": "Novo Usuário",
+  "email": "novo.usuario@example.invalid",
+  "password": "senha-segura"
+}
+
+### Consultar o próprio perfil (usuário autenticado)
+GET {{Thorns_HostAddress}}/api/Users/me
+Authorization: Bearer {{token}}
 Accept: application/json
 
-###
+### Atualizar o próprio perfil
+PUT {{Thorns_HostAddress}}/api/Users/me
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Usuário de Teste",
+  "email": "usuario.teste@example.invalid",
+  "cpf": "529.982.247-25",
+  "cep": "01001-000"
+}
+
+### Listar usuários (somente Admin)
+GET {{Thorns_HostAddress}}/api/Users
+Authorization: Bearer {{token}}
+Accept: application/json
+
+### Consultar usuário por ID (somente Admin)
+GET {{Thorns_HostAddress}}/api/Users/{{userId}}
+Authorization: Bearer {{token}}
+Accept: application/json
+
+### Atualizar usuário por ID (somente Admin)
+PUT {{Thorns_HostAddress}}/api/Users/{{userId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Usuário de Teste",
+  "email": "usuario.teste@example.invalid",
+  "cpf": "52998224725",
+  "cep": "01001000",
+  "role": "User",
+  "password": null
+}

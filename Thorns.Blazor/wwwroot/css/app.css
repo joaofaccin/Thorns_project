@@ -1,5 +1,98 @@
+﻿:root {
+    --app-sidebar-background: linear-gradient(180deg, #082b61 0%, #342044 100%);
+    --app-header-background: #f7f7f7;
+    --app-login-background: #f4f6fb;
+    --app-login-input-background: #fff;
+    --app-login-text: #212529;
+    --app-login-muted: #5c6675;
+}
+
+:root[data-bs-theme="dark"] {
+    --app-sidebar-background: linear-gradient(180deg, #161b26 0%, #24202b 100%);
+    --app-header-background: #212529;
+    --app-login-background: #000;
+    --app-login-input-background: #000;
+    --app-login-text: #fff;
+    --app-login-muted: #94a3b8;
+}
+
+.theme-toggle {
+    margin-left: 1rem;
+    white-space: nowrap;
+}
+
+.registration-page {
+    display: flex;
+    min-height: 100vh;
+    margin: -1.1rem -1.5rem 0;
+    background: var(--app-login-background);
+}
+
+.registration-panel {
+    display: flex;
+    width: 50%;
+    min-height: 100vh;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    background: var(--app-login-background);
+}
+
+.registration-container {
+    width: 100%;
+    max-width: 460px;
+    color: var(--app-login-text);
+}
+
+.registration-container h1 {
+    margin-bottom: 2rem;
+    color: var(--app-login-text);
+}
+
+.registration-container .form-group {
+    margin-bottom: 1rem;
+}
+
+.registration-container .form-group label {
+    display: block;
+    margin-bottom: 0.4rem;
+    color: var(--app-login-muted);
+}
+
+.registration-container .register-link {
+    margin-top: 1.5rem;
+    text-align: center;
+}
+
+.registration-container .register-link a {
+    color: var(--app-login-muted);
+}
+
+.registration-art {
+    width: 50%;
+    min-height: 100vh;
+    background: #080310 url('/images/background.png') 75% center / cover no-repeat;
+}
+
+@media (max-width: 768px) {
+    .registration-panel {
+        width: 100%;
+    }
+
+    .registration-art {
+        display: none;
+    }
+}
+
 html, body {
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    min-height: 100%;
+}
+
+body {
+    background-color: var(--bs-body-bg);
+    color: var(--bs-body-color);
+    transition: background-color 160ms ease, color 160ms ease;
 }
 
 h1:focus {
@@ -7,7 +100,7 @@ h1:focus {
 }
 
 a, .btn-link {
-    color: #0071c1;
+    color: var(--bs-link-color);
 }
 
 .btn-primary {
@@ -102,7 +195,7 @@ a, .btn-link {
     }
 
 code {
-    color: #c02d76;
+    color: var(--bs-code-color);
 }
 
 .form-floating > .form-control-plaintext::placeholder, .form-floating > .form-control::placeholder {

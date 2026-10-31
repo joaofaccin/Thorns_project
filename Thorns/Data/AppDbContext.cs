@@ -36,12 +36,28 @@ public class AppDbContext : DbContext
                 .HasMaxLength(150)
                 .IsRequired();
 
+            entity.Property(u => u.Cpf)
+                .HasColumnName("cpf")
+                .HasMaxLength(11);
+
+            entity.HasIndex(u => u.Cpf)
+                .IsUnique()
+                .HasFilter("\"cpf\" IS NOT NULL");
+
+            entity.Property(u => u.Cep)
+                .HasColumnName("cep")
+                .HasMaxLength(8);
+
             entity.HasIndex(u => u.Email)
                 .IsUnique();
 
             entity.Property(u => u.PasswordHash)
                 .HasColumnName("password_hash")
                 .IsRequired();
+
+            entity.Property(u => u.TokenVersion)
+                .HasColumnName("token_version")
+                .HasDefaultValue(0);
 
             entity.Property(u => u.Role)
     .HasColumnName("role")

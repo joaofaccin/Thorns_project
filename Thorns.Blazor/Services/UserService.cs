@@ -27,17 +27,42 @@ public class UserService
             ?? new List<UserResponse>();
     }
 
-    // =====================================
-    // USUÁRIO AUTENTICADO
-    // =====================================
-
-    public async Task<CurrentUserResponse?> GetMeAsync()
+    public async Task<UserProfileResponse?> GetOwnProfileAsync()
     {
-        var response = await _httpClient.GetAsync("api/Auth/me");
+        var response = await _httpClient.GetAsync("api/Users/me");
 
         response.EnsureSuccessStatusCode();
 
         return await response.Content
-            .ReadFromJsonAsync<CurrentUserResponse>();
+            .ReadFromJsonAsync<UserProfileResponse>();
+    }
+
+    public async Task UpdateOwnProfileAsync(UserProfileForm request)
+    {
+        var response = await _httpClient.PutAsJsonAsync(
+            "api/Users/me",
+            request
+        );
+
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task<UserResponse?> GetUserByIdAsync(int id)
+    {
+        var response = await _httpClient.GetAsync($"api/Users/{id}");
+
+        response.EnsureSuccessStatusCode();
+
+        return await response.Content.ReadFromJsonAsync<UserResponse>();
+    }
+
+    public async Task UpdateUserAsync(int id, AdminUserForm request)
+    {
+        var response = await _httpClient.PutAsJsonAsync(
+            $"api/Users/{id}",
+            request
+        );
+
+        response.EnsureSuccessStatusCode();
     }
 }

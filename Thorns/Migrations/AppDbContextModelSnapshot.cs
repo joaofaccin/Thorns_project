@@ -31,6 +31,16 @@ namespace Thorns.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("Cep")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("cep");
+
+                    b.Property<string>("Cpf")
+                        .HasMaxLength(11)
+                        .HasColumnType("character varying(11)")
+                        .HasColumnName("cpf");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -76,11 +86,21 @@ namespace Thorns.Migrations
                         .HasDefaultValue("User")
                         .HasColumnName("role");
 
+                    b.Property<int>("TokenVersion")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("token_version");
+
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("Cpf")
+                        .IsUnique()
+                        .HasFilter("\"cpf\" IS NOT NULL");
 
                     b.HasIndex("Email")
                         .IsUnique();

@@ -3,6 +3,14 @@ using Thorns.Blazor.Models;
 
 namespace Thorns.Blazor.Services;
 
+public enum AuthOperationResult
+{
+    Success,
+    InvalidCredentials,
+    Conflict,
+    RateLimited
+}
+
 public class AuthService
 {
     private readonly HttpClient _httpClient;
@@ -17,7 +25,7 @@ public class AuthService
         _authStateProvider = authStateProvider;
     }
 
-    public async Task<bool> LoginAsync(
+    public async Task<AuthOperationResult> LoginAsync(
         string email,
         string password)
     {
@@ -32,22 +40,52 @@ public class AuthService
             request
         );
 
-        if (!response.IsSuccessStatusCode)
+        if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
         {
-            return false;
+            return AuthOperationResult.RateLimited;
         }
+
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            return AuthOperationResult.InvalidCredentials;
+        }
+
+        response.EnsureSuccessStatusCode();
 
         var result = await response.Content
             .ReadFromJsonAsync<LoginResponse>();
 
         if (string.IsNullOrWhiteSpace(result?.Token))
         {
-            return false;
+            throw new InvalidDataException(
+                "A API retornou uma resposta de login sem token.");
         }
 
         await _authStateProvider.SetAuthenticatedUserAsync(result.Token);
 
-        return true;
+        return AuthOperationResult.Success;
+    }
+
+    public async Task<AuthOperationResult> RegisterAsync(
+        UserRegistrationForm request)
+    {
+        var response = await _httpClient.PostAsJsonAsync(
+            "api/Auth/register",
+            new
+            {
+                request.Name,
+                request.Email,
+                request.Password
+            });
+
+        if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
+            return AuthOperationResult.Conflict;
+
+        if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+            return AuthOperationResult.RateLimited;
+
+        response.EnsureSuccessStatusCode();
+        return AuthOperationResult.Success;
     }
 
     public async Task LogoutAsync()
